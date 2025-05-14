@@ -1,0 +1,32 @@
+version: 0.2 
+phases: 
+  install: 
+    runtime-version:
+    docker: 20
+    commands: 
+      - echo Getting Started
+  pre_build:
+    commands: 
+      - aws --version
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+      - echo "Cloning the GitHub repo..."
+      - git clone $GITHUB_REPO_URL repo
+      - cd repo
+  build: 
+    commands: 
+      - echo "Building the Docker image..."
+      - docker build -t $ECR_REPOSITORY:$CODEBUILD_BUILD_ID -f Dockerfile .
+  post_build: 
+    command:  
+      - echo "Tagging the Docker image..."
+      - docker tag $ECR_REPOSITORY:$CODEBUILD_BUILD_ID $ECR_REGISTRY/$ECR_REPOSITORY:$CODEBUILD_BUILD_ID
+      - echo "Pushing the Docker image to ECR..."
+      - docker push $ECR_REGISTRY/$ECR_REPOSITORY:$CODEBUILD_BUILD_ID
+      - echo "Build completed on $(date)"
+  env:
+    variables:
+      AWS_REGION: us-east-1
+      ECR_REGISTRY: 769126752719.dkr.ecr.$AWS_REGION.amazonaws.com
+      ECR_REPOSITORY: nginx-ecs
+      GITHUB_REPO_URL: "https://github.com/faran151/nginx-ecs"
