@@ -4,6 +4,4 @@ Resources:
       Type: AWS::ECS::Service
       Properties:
         TaskDefinition: "arn:aws:ecs:ap-northeast-1:769126752719:task-definition/nginx-ecs:1"
-        LoadBalancerInfo:
-          ContainerName: "nginx-ecs"
-          ContainerPort: 80
+        PlatformVersion: "LATEST"
