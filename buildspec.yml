@@ -1,32 +1,32 @@
-version: 0.2 
-env:
-    variables:
-      AWS_REGION: us-east-1
-      ECR_REGISTRY: 769126752719.dkr.ecr.ap-northeast-1.amazonaws.com
-      ECR_REPOSITORY: nginx-ecs
-      GITHUB_REPO_URL: "https://github.com/faran151/nginx-ecs"
-phases: 
-  install: 
-    runtime-version:
-    docker: 20
-    commands: 
-      - echo Getting Started
+version: 0.2
+
+phases:
   pre_build:
-    commands: 
-      - aws --version
-      - echo "Logging in to Amazon ECR..."
-      - aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
-      - echo "Cloning the GitHub repo..."
-      - git clone $GITHUB_REPO_URL repo
-      - cd repo
-  build: 
-    commands: 
-      - echo "Building the Docker image..."
-      - docker build -t $ECR_REPOSITORY:latest -f Dockerfile .
-  post_build: 
-    command:  
-      - echo "Tagging the Docker image..."
-      - docker tag $ECR_REPOSITORY:latest $ECR_REGISTRY/$ECR_REPOSITORY:latest
-      - echo "Pushing the Docker image to ECR..."
-      - docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-      - echo "Build completed on $(date)"
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build -t $REPOSITORY_URI:latest
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Writing image definitions file...
+      - printf '[{"name":"%s","imageUri":"%s"}]' $CONTAINER_NAME $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+      - echo Creating task definition for CodeDeploy...
+      - aws ecs describe-task-definition --task-definition $TASK_DEFINITION_NAME --query taskDefinition > taskdef.json
+      - cp appspec.yaml appspec_final.yml
+artifacts:
+  files:
+    - imagedefinitions.json
+    - appspec_final.yml
+    - taskdef.json
